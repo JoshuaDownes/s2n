@@ -97,6 +97,7 @@ struct s2n_handshake {
 
 /* Handshake needs OCSP status message */
 #define OCSP_STATUS                 0x08
+#define IS_OCSP_STAPLED( type ) ( (type) & OCSP_STATUS )
 
 /* Handshake should request a Client Certificate */
 #define CLIENT_AUTH                 0x10
@@ -106,6 +107,7 @@ struct s2n_handshake {
 
 /* Session Resumption via session-tickets */
 #define WITH_SESSION_TICKET         0x20
+#define IS_ISSUING_NEW_SESSION_TICKET( type )   ( (type) & WITH_SESSION_TICKET )
 
     /* Which handshake message number are we processing */
     int message_number;

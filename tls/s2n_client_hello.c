@@ -256,7 +256,7 @@ static int s2n_populate_client_hello_extensions(struct s2n_client_hello *ch)
         notnull_check(ch->parsed_extensions = s2n_array_new(sizeof(struct s2n_client_hello_parsed_extension)));
     }
 
-    struct s2n_stuffer in;
+    struct s2n_stuffer in = {{0}};
 
     GUARD(s2n_stuffer_init(&in, &ch->extensions));
     GUARD(s2n_stuffer_write(&in, &ch->extensions));
@@ -320,7 +320,7 @@ int s2n_client_hello_recv(struct s2n_connection *conn)
 int s2n_client_hello_send(struct s2n_connection *conn)
 {
     struct s2n_stuffer *out = &conn->handshake.io;
-    struct s2n_stuffer client_random;
+    struct s2n_stuffer client_random = {{0}};
     struct s2n_blob b, r;
     uint8_t client_protocol_version[S2N_TLS_PROTOCOL_VERSION_LEN];
 
@@ -341,6 +341,16 @@ int s2n_client_hello_send(struct s2n_connection *conn)
 
     GUARD(s2n_stuffer_write_bytes(out, client_protocol_version, S2N_TLS_PROTOCOL_VERSION_LEN));
     GUARD(s2n_stuffer_copy(&client_random, out, S2N_TLS_RANDOM_DATA_LEN));
+
+    /* Generate client session id when empty so that when server sends
+     * an empty session id it is because it doesn't support session resumption
+     */
+    if (conn->session_id_len == 0 && conn->config->use_tickets) {
+        struct s2n_blob session_id = { .data = conn->session_id, .size = S2N_TLS_SESSION_ID_MAX_LEN };
+
+        GUARD(s2n_get_public_random_data(&session_id));
+        conn->session_id_len = S2N_TLS_SESSION_ID_MAX_LEN;
+    }
 
     GUARD(s2n_stuffer_write_uint8(out, conn->session_id_len));
     if (conn->session_id_len > 0) {
@@ -422,7 +432,7 @@ int s2n_sslv2_client_hello_recv(struct s2n_connection *conn)
         GUARD(s2n_stuffer_skip_read(in, session_id_length));
     }
 
-    struct s2n_blob b;
+    struct s2n_blob b = {0};
     b.data = conn->secure.client_random;
     b.size = S2N_TLS_RANDOM_DATA_LEN;
 
@@ -442,7 +452,7 @@ int s2n_client_hello_get_parsed_extension(struct s2n_array *parsed_extensions, s
 {
     notnull_check(parsed_extensions);
 
-    struct s2n_client_hello_parsed_extension search;
+    struct s2n_client_hello_parsed_extension search = {0};
     search.extension_type = extension_type;
 
     struct s2n_client_hello_parsed_extension *result_extension = bsearch(&search, parsed_extensions->elements, parsed_extensions->num_of_elements,
@@ -460,7 +470,7 @@ ssize_t s2n_client_hello_get_extension_length(struct s2n_client_hello *ch, s2n_t
     notnull_check(ch);
     notnull_check(ch->parsed_extensions);
 
-    struct s2n_client_hello_parsed_extension parsed_extension;
+    struct s2n_client_hello_parsed_extension parsed_extension = {0};
 
     if (s2n_client_hello_get_parsed_extension(ch->parsed_extensions, extension_type, &parsed_extension)) {
         return 0;
@@ -475,7 +485,7 @@ ssize_t s2n_client_hello_get_extension_by_id(struct s2n_client_hello *ch, s2n_tl
     notnull_check(out);
     notnull_check(ch->parsed_extensions);
 
-    struct s2n_client_hello_parsed_extension parsed_extension;
+    struct s2n_client_hello_parsed_extension parsed_extension = {0};
 
     if (s2n_client_hello_get_parsed_extension(ch->parsed_extensions, extension_type, &parsed_extension)) {
         return 0;
